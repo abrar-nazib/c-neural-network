@@ -3,13 +3,12 @@
 #include <stdlib.h>
 
 // Global size of the perceptron
-#define WIDTH 20
-#define HEIGHT 20
+#define WIDTH 50
+#define HEIGHT 50
+#define PPM_SCALER 25  // scalar proportion to scale the image while showing
+#define SAMPLE_SIZE 10 // samples to create or test
 
 typedef float Layer[HEIGHT][WIDTH]; // Perceptron layer
-
-static Layer input;   // Input pixels
-static Layer weights; // Weights
 
 /**
  * Function for feeding input to the model and getting the guessed output
@@ -49,11 +48,11 @@ void create_rect(Layer layer, int x, int y, int w, int h, float value)
     int y0 = limit_in_range_i(y, 0, HEIGHT - 1);
 
     // setting width and height
-    w = limit_in_range_i(w, 1, (WIDTH - 1) - x0);
-    h = limit_in_range_i(h, 1, (HEIGHT - 1) - y0);
+    w = limit_in_range_i(w, 1, WIDTH);
+    h = limit_in_range_i(h, 1, HEIGHT);
 
-    int x1 = x0 + w;
-    int y1 = y0 + h;
+    int x1 = limit_in_range_i(x0 + w - 1, 0, WIDTH - 1);
+    int y1 = limit_in_range_i(y0 + h - 1, 0, WIDTH - 1);
 
     // Fillup the space using the given value
     for (int ix = x0; ix <= x1; ix++)
@@ -66,9 +65,34 @@ void create_rect(Layer layer, int x, int y, int w, int h, float value)
 }
 
 /**
+ * Function for creating circles
+ */
+void create_circle(Layer layer, int cx, int cy, int r, float value)
+{
+    r = limit_in_range_i(r, 1, WIDTH / 2);
+    int x0 = limit_in_range_i(cx - r, 0, WIDTH - 1); // first point x coordinate of the circle
+    int x1 = limit_in_range_i(cx + r, 0, WIDTH - 1); // first point x coordinate of the circle
+    int y0 = limit_in_range_i(cy - r, 0, HEIGHT - 1);
+    int y1 = limit_in_range_i(cy + r, 0, HEIGHT - 1);
+    int dx, dy; // for measuring the distance from the center point
+    for (int iy = y0; iy < y1; iy++)
+    {
+        for (int ix = x0; ix < x1; ix++)
+        {
+            dx = cx - ix;
+            dy = cy - iy;
+            if (dx * dx + dy * dy <= r * r)
+            {
+                layer[iy][ix] = value;
+            }
+        }
+    }
+}
+
+/**
  * Function to save a layer as ppm file
  */
-void save_layer(Layer layer, const char *filepath)
+void save_layer_ppm(Layer layer, const char *filepath)
 {
     FILE *f = fopen(filepath, "wb"); // open file to write in binary format
 
@@ -77,14 +101,14 @@ void save_layer(Layer layer, const char *filepath)
         fprintf(stderr, "File could not be opened %s", filepath);
         exit(1);
     }
-    fprintf(f, "P6\n%d %d 255\n", WIDTH, HEIGHT); // Don't quite understand why this line need to be included. Most likely codec stuff
+    fprintf(f, "P6\n%d %d 255\n", WIDTH * PPM_SCALER, HEIGHT * PPM_SCALER); // Don't quite understand why this line need to be included. Most likely codec stuff
 
     // write pixels to the file
-    for (int iy = 0; iy < HEIGHT; iy++)
+    for (int iy = 0; iy < HEIGHT * PPM_SCALER; iy++)
     {
-        for (int ix = 0; ix < WIDTH; ix++)
+        for (int ix = 0; ix < WIDTH * PPM_SCALER; ix++)
         {
-            float s = layer[iy][ix];
+            float s = layer[iy / PPM_SCALER][ix / PPM_SCALER];
             char pixel[3] = {
                 (char)floorf(s * 255), // why not only floor? floor is for double. floorf() is float specific
                 0,
@@ -96,10 +120,81 @@ void save_layer(Layer layer, const char *filepath)
     fclose(f);
 }
 
+/**
+ * Function for saving the model
+ */
+void save_layer_bin(Layer layer, const char *file_path)
+{
+    FILE *f = fopen(file_path, "wb");
+    if (f == NULL)
+    {
+        fprintf(stderr, "Error in opening file %s", file_path);
+        exit(1);
+    }
+    fwrite(layer, sizeof(Layer), 1, f);
+    // layer -> print the elements of the layer.
+    // Buffer size -> sizeof Layer variable
+    // Elements to print -> 1
+    // Which file to print -> f
+    fclose(f);
+}
+
+void load_model(Layer layer, const char *file_path)
+{
+    return;
+}
+
+int rand_range(int low, int high)
+{
+    if (low > high)
+    {
+        exit(1);
+    }
+    return rand() % (high - low) + low;
+}
+
+/**
+ * Function for generating random rectangles for traiining
+ */
+void layer_random_rect(Layer input)
+{
+    create_rect(input, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
+    int x = rand_range(0, WIDTH);
+    int y = rand_range(0, HEIGHT);
+    int w = rand_range(1, WIDTH);
+    int h = rand_range(1, HEIGHT);
+    create_rect(input, x, y, w, h, 1.0f);
+}
+
+/**
+ * Function for generating random circles for training
+ */
+void layer_random_circle(Layer input)
+{
+    create_rect(input, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
+    int cx = rand_range(0, WIDTH);
+    int cy = rand_range(0, HEIGHT);
+    int r = rand_range(1, WIDTH);
+    create_circle(input, cx, cy, r, 1.0f);
+}
+
+static Layer input;   // Input pixels
+static Layer weights; // Weights
+
 int main()
 {
+    char file_path[256];
+    for (int i = 0; i < SAMPLE_SIZE; ++i)
+    {
+        // print in the buffer. Why not strcpy? most likely the format string thing
+        printf("Generating %s\n", file_path);
+        // layer_random_rect(input);
+        layer_random_circle(input);
+        snprintf(file_path, sizeof(file_path), "circle-%02d.bin", i); // snprintf for format string stuffs
+        save_layer_ppm(input, file_path);
+        snprintf(file_path, sizeof(file_path), "circle-%02d.ppm", i);
+        save_layer_bin(input, file_path);
+    }
 
-    create_rect(input, 0, 0, WIDTH / 2, HEIGHT / 2, 1.0f);
-    save_layer(input, "output.ppm");
     return 0;
 }
