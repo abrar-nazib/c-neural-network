@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <float.h>
 
 // Global size of the perceptron
-#define WIDTH 50
-#define HEIGHT 50
-#define PPM_SCALER 25  // scalar proportion to scale the image while showing
-#define SAMPLE_SIZE 10 // samples to create or test
+#define WIDTH 80
+#define HEIGHT 80
+
+// #define PPM_SCALER 25   // scalar proportion to scale the image while showing
+#define SAMPLE_SIZE 100 // samples to create or test
+
+#define BIAS 10 // experimental bias value for decision making of the neuron
 
 typedef float Layer[HEIGHT][WIDTH]; // Perceptron layer
 
@@ -75,9 +79,9 @@ void create_circle(Layer layer, int cx, int cy, int r, float value)
     int y0 = limit_in_range_i(cy - r, 0, HEIGHT - 1);
     int y1 = limit_in_range_i(cy + r, 0, HEIGHT - 1);
     int dx, dy; // for measuring the distance from the center point
-    for (int iy = y0; iy < y1; iy++)
+    for (int iy = y0; iy <= y1; iy++)
     {
-        for (int ix = x0; ix < x1; ix++)
+        for (int ix = x0; ix <= x1; ix++)
         {
             dx = cx - ix;
             dy = cy - iy;
@@ -94,6 +98,24 @@ void create_circle(Layer layer, int cx, int cy, int r, float value)
  */
 void save_layer_ppm(Layer layer, const char *filepath)
 {
+
+    float min = FLT_MAX;
+    float max = FLT_MIN;
+    for (int iy = 0; iy < HEIGHT - 1; iy++)
+    {
+        for (int ix = 0; ix < WIDTH - 1; ix++)
+        {
+            if (layer[iy][ix] < min)
+            {
+                min = layer[iy][ix];
+            }
+            if (layer[iy][ix] > max)
+            {
+                max = layer[iy][ix];
+            }
+        }
+    }
+
     FILE *f = fopen(filepath, "wb"); // open file to write in binary format
 
     if (f == NULL) // handling failure while opening file
@@ -108,7 +130,7 @@ void save_layer_ppm(Layer layer, const char *filepath)
     {
         for (int ix = 0; ix < WIDTH * PPM_SCALER; ix++)
         {
-            float s = layer[iy / PPM_SCALER][ix / PPM_SCALER];
+            float s = (layer[iy / PPM_SCALER][ix / PPM_SCALER] - min) / (max - min); // limits the value between 0-1 in pixel. Working as a scalar
             char pixel[3] = {
                 (char)floorf(s * 255), // why not only floor? floor is for double. floorf() is float specific
                 0,
@@ -139,7 +161,7 @@ void save_layer_bin(Layer layer, const char *file_path)
     fclose(f);
 }
 
-void load_model(Layer layer, const char *file_path)
+void load_layer_bin(Layer layer, const char *file_path)
 {
     return;
 }
@@ -156,44 +178,99 @@ int rand_range(int low, int high)
 /**
  * Function for generating random rectangles for traiining
  */
-void layer_random_rect(Layer input)
+void layer_random_rect(Layer inputs)
 {
-    create_rect(input, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
+    create_rect(inputs, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
     int x = rand_range(0, WIDTH);
     int y = rand_range(0, HEIGHT);
-    int w = rand_range(1, WIDTH);
-    int h = rand_range(1, HEIGHT);
-    create_rect(input, x, y, w, h, 1.0f);
+
+    // determining suitable width
+    int w = WIDTH - x;
+    if (w < 2)
+        w = 2;
+    w = rand_range(1, w);
+
+    // determining suitable height
+    int h = HEIGHT - y;
+    if (h < 2)
+        h = 2;
+    h = rand_range(1, h);
+
+    create_rect(inputs, x, y, w, h, 1.0f);
 }
 
 /**
  * Function for generating random circles for training
  */
-void layer_random_circle(Layer input)
+void layer_random_circle(Layer inputs)
 {
-    create_rect(input, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
+    create_rect(inputs, 0, 0, WIDTH, HEIGHT, 0.0f); // filling the whole layer with white
     int cx = rand_range(0, WIDTH);
     int cy = rand_range(0, HEIGHT);
-    int r = rand_range(1, WIDTH);
-    create_circle(input, cx, cy, r, 1.0f);
+
+    // applying condition to generate circles inside the window
+    int r = __INT_MAX__;
+    if (r > cx)
+        r = cx;
+    if (r > cy)
+        r = cy;
+    if (r > WIDTH - cx)
+        r = WIDTH - cx;
+    if (r > HEIGHT - cy)
+        r = HEIGHT - cy;
+    r = rand_range(1, r);
+    create_circle(inputs, cx, cy, r, 1.0f);
 }
 
-static Layer input;   // Input pixels
+/**
+ * Function to add inputs to weights
+ * Need to add to the weights if want the output neuron to be fired
+ */
+void excite_neuron(Layer inputs, Layer weights)
+{
+    for (int iy = 0; iy < HEIGHT; iy++)
+    {
+        for (int ix = 0; ix < WIDTH; ix++)
+        {
+            weights[iy][ix] += inputs[iy][ix];
+        }
+    }
+}
+
+/**
+ * Function to subtract inputs from weights
+ * If the output neuron need not to be fired, subtraction is needed
+ */
+void supress_neuron(Layer inputs, Layer weights)
+{
+    for (int iy = 0; iy < HEIGHT; iy++)
+    {
+        for (int ix = 0; ix < WIDTH; ix++)
+        {
+            weights[iy][ix] -= inputs[iy][ix];
+        }
+    }
+}
+
+static Layer inputs;  // Input pixels
 static Layer weights; // Weights
 
 int main()
 {
-    char file_path[256];
-    for (int i = 0; i < SAMPLE_SIZE; ++i)
+    srand(69); // seeding random number generator with a constant. Not using time right now tho
+    for (int i = 0; i < SAMPLE_SIZE; i++)
     {
-        // print in the buffer. Why not strcpy? most likely the format string thing
-        printf("Generating %s\n", file_path);
-        // layer_random_rect(input);
-        layer_random_circle(input);
-        snprintf(file_path, sizeof(file_path), "circle-%02d.bin", i); // snprintf for format string stuffs
-        save_layer_ppm(input, file_path);
-        snprintf(file_path, sizeof(file_path), "circle-%02d.ppm", i);
-        save_layer_bin(input, file_path);
+        layer_random_rect(inputs);
+        // if (feed_forward(inputs, weights) > BIAS)
+        // { // neuron need not to be fired when sees rectangle
+        // supress_neuron(inputs, weights);
+        // }
+        printf("%d\n", i);
+        layer_random_circle(inputs);
+        // if (feed_forward(inputs, weights) < BIAS)
+        // { // neuron need to be fired when sees circle
+        // excite_neuron(inputs, weights);
+        // }
     }
 
     return 0;
