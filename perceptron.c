@@ -155,9 +155,8 @@ void layer_save_as_bin(Layer layer, const char *file_path)
  */
 void layer_load_from_bin(Layer layer, const char *file_path)
 {
-    // (void)layer;
-    // (void)file_path;
-    // assert(0 && "TODO: layer_load_from_bin is not implemented yet!");
+    // pore korbo
+    return;
 }
 
 /**
@@ -339,6 +338,9 @@ int test_model(Layer inputs, Layer weights, int div)
     return n_error;
 }
 
+/**
+ * Train the model with on-the-fly generated images
+ */
 void train_model(Layer inputs, Layer weights)
 {
     static char file_path[256];
