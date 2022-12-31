@@ -155,8 +155,9 @@ void layer_save_as_bin(Layer layer, const char *file_path)
  */
 void layer_load_from_bin(Layer layer, const char *file_path)
 {
-    // pore korbo
-    return;
+    FILE *f = fopen(file_path, "rb");
+    size_t x = fread(layer, 1, sizeof(Layer) + 1, f);
+    fclose(f);
 }
 
 /**
@@ -314,6 +315,9 @@ int test_model(Layer inputs, Layer weights, int div)
             snprintf(file_path, sizeof(file_path), DATA_FOLDER "/training_data/rect-%d.ppm", i);
             // printf("%s is saved\n", file_path);
             layer_save_as_ppm(inputs, file_path);
+            snprintf(file_path, sizeof(file_path), DATA_FOLDER "/bin/rect-%d.bin", i);
+            // printf("%s is saved\n", file_path);
+            layer_save_as_bin(inputs, file_path);
         }
         if (feed_forward(inputs, weights) > BIAS)
         {
@@ -327,6 +331,9 @@ int test_model(Layer inputs, Layer weights, int div)
             snprintf(file_path, sizeof(file_path), DATA_FOLDER "/training_data/circle-%d.ppm", i);
             // printf("%s is saved\n", file_path);
             layer_save_as_ppm(inputs, file_path);
+            snprintf(file_path, sizeof(file_path), DATA_FOLDER "/bin/circle-%d.bin", i);
+            // printf("%s is saved\n", file_path);
+            layer_save_as_bin(inputs, file_path);
         }
         if (feed_forward(inputs, weights) < BIAS)
         {
@@ -336,6 +343,22 @@ int test_model(Layer inputs, Layer weights, int div)
     }
 
     return n_error;
+}
+
+void manualModelTest(Layer model, const char *file_path)
+{
+    float output;
+    Layer inputs;
+    layer_load_from_bin(inputs, file_path);
+    output = feed_forward(inputs, model);
+    if (output > BIAS)
+    {
+        printf("[GUESS] CIRCLE \t %f\n", output);
+    }
+    else
+    {
+        printf("[GUESS] RECTANGLE \t %f\n", output);
+    }
 }
 
 /**
@@ -366,39 +389,56 @@ void train_model(Layer inputs, Layer weights)
 static Layer inputs;
 static Layer weights;
 
-int main(void)
+// int main(void)
+// {
+//     char interruptor = 'a';
+
+//     static char file_path[256]; // for saving the trained model
+
+//     // check the accuracy of the untrained model
+//     srand(CHECK_SEED); // set seed for for checking
+//     int adj = test_model(inputs, weights, 1);
+//     printf("Accuracy of untrained model is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
+
+//     scanf("%c", &interruptor); // interruption for
+
+//     // Save the untrained model as ppm
+//     snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/visuals/model-w%d-h%d-r%d-s%d-untrained.ppm", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
+//     layer_save_as_ppm(weights, file_path);
+
+//     // Train model
+//     train_model(inputs, weights);
+
+//     // test after training with training data
+//     srand(TRAIN_SEED);
+//     adj = test_model(inputs, weights, 1);
+//     printf("Accuracy of trained model in training data is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
+
+//     // test after training with new data
+//     srand(CHECK_SEED);
+//     adj = test_model(inputs, weights, 3);
+//     printf("Accuracy of trained model in new data is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
+
+//     // save the model
+//     snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/model-w%d-h%d-r%d-s%d.bin", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
+//     layer_save_as_bin(weights, file_path);
+//     snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/model-w%d-h%d-r%d-s%d.ppm", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
+//     layer_save_as_ppm(weights, file_path);
+//     return 0;
+// }
+
+int main()
 {
-    char interruptor = 'a';
-    static char file_path[256]; // for saving the trained model
-
-    // check the accuracy of the untrained model
-    srand(CHECK_SEED); // set seed for for checking
-    int adj = test_model(inputs, weights, 1);
-    printf("Accuracy of untrained model is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
-
-    scanf("%c", &interruptor); // interruption for
-
-    // Save the untrained model as ppm
-    snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/visuals/model-w%d-h%d-r%d-s%d-untrained.ppm", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
-    layer_save_as_ppm(weights, file_path);
-
-    // Train model
-    train_model(inputs, weights);
-
-    // test after training with training data
-    srand(TRAIN_SEED);
-    adj = test_model(inputs, weights, 1);
-    printf("Accuracy of trained model in training data is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
-
-    // test after training with new data
-    srand(CHECK_SEED);
-    adj = test_model(inputs, weights, 3);
-    printf("Accuracy of trained model in new data is %f%%\n", (1 - adj / (SAMPLE_SIZE * 2.0)) * 100);
-
-    // save the model
-    snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/model-w%d-h%d-r%d-s%d", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
-    layer_save_as_bin(weights, file_path);
-    snprintf(file_path, sizeof(file_path), MODEL_FOLDER "/model-w%d-h%d-r%d-s%d.ppm", WIDTH, HEIGHT, TRAIN_SEED, SAMPLE_SIZE);
-    layer_save_as_ppm(weights, file_path);
-    return 0;
+    char filename[100];
+    char filename2[100];
+    Layer model;
+    layer_load_from_bin(model, "ml_models/model-w100-h100-r63-s4000.bin");
+    printf("Loaded model model-w100-h100-r63-s4000.bin\nTo test the model, input filename\n");
+    while (true)
+    {
+        printf("Enter Filename: ");
+        scanf("%s", filename2);
+        snprintf(filename, sizeof(filename), DATA_FOLDER "/bin/%s", filename2);
+        manualModelTest(model, filename);
+    }
 }
