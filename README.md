@@ -1,11 +1,5 @@
-# Neural Network in C Programming Language
+# Raw Implementation of Neural Network
 
-So far I just understood the working procedure of a perceptron and ways of training it. `perceptron.c` has the code\
-
-Make sure `data/training_data` and `data/bin` folder exists in the root folder (where perceptron.c is)
-
-```
-gcc perceptron.c -lm -o perceptron ; ./perceptron
-```
-
-Execute above command for getting started
+This repository is focused on my learning of neural networks.\
+Here I program a neural networks from ground up avoiding as much use of library functions as possible.\
+The main goal of this repository is to understand the raw basics of AI and neural networks.
